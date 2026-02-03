@@ -1,78 +1,80 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-logfile="$HOME/claude-hooks.log"
+# --- Configuration ---
+logfile="${PDA_TTS_LOG:-$HOME/claude-hooks.log}"
+dry_run="${PDA_TTS_DRY_RUN:-}"
 
-# --- Read stdin safely (short timeout, no hang) ---
-read_payload_py='
-import sys,select,time,os,json
-data=""
-# wait up to 0.2s for stdin to be ready
-r,_,_=select.select([sys.stdin],[],[],0.2)
-if r:
-    data=sys.stdin.read()
-print(data,end="")
-'
-payload="$(python3 -c "$read_payload_py" || true)"
-
-# Log raw for debugging
-{
-  echo "----- $(date) -----"
-  echo "stdin bytes: ${#payload}"
-  if [ -n "$payload" ]; then
-    # trim to 500 chars to avoid huge logs
-    echo "stdin preview: ${payload:0:500}"
-  else
-    echo "stdin is EMPTY"
-  fi
-} >> "$logfile" 2>/dev/null || true
-
-# --- Parse JSON if present ---
-parse_py='
-import json,sys
-try:
-    raw=sys.stdin.read()
-    data=json.loads(raw) if raw.strip() else {}
-except Exception:
-    data={}
-print(data.get("hook_event_name","Unknown"))
-print(data.get("message",""))
-'
-event="Unknown"
-msg=""
-if [ -n "$payload" ]; then
-  parsed="$(printf '%s' "$payload" | python3 -c "$parse_py" || true)"
-  event="$(printf '%s' "$parsed" | sed -n '1p')"
-  msg="$(printf  '%s' "$parsed" | sed -n '2p')"
+# --- Read stdin with timeout (don't hang if empty) ---
+payload=""
+if read -t 0.2 -r payload; then
+  # Read any additional lines (for multi-line JSON)
+  while read -t 0.1 -r line; do
+    payload="$payload$line"
+  done
 fi
 
-# If still empty, craft reasonable defaults
-if [ -z "${msg:-}" ]; then
+# --- Log raw input for debugging ---
+if [[ -z "$dry_run" ]]; then
+  {
+    echo "----- $(date) -----"
+    echo "stdin bytes: ${#payload}"
+    if [[ -n "$payload" ]]; then
+      echo "stdin preview: ${payload:0:500}"
+    else
+      echo "stdin is EMPTY"
+    fi
+  } >> "$logfile" 2>/dev/null || true
+fi
+
+# --- Parse JSON with jq (fallback to defaults if missing/invalid) ---
+event="Unknown"
+msg=""
+
+if [[ -n "$payload" ]] && command -v jq >/dev/null 2>&1; then
+  event=$(printf '%s' "$payload" | jq -r '.hook_event_name // "Unknown"' 2>/dev/null) || event="Unknown"
+  msg=$(printf '%s' "$payload" | jq -r '.message // ""' 2>/dev/null) || msg=""
+fi
+
+# --- Default messages per event type ---
+if [[ -z "$msg" ]]; then
   case "$event" in
     SessionStart) msg="Systems online." ;;
     Stop)         msg="Task complete." ;;
-    Notification) msg="Notification: awaiting your input." ;;
+    Notification) msg="Awaiting your input." ;;
     *)            msg="$event event occurred." ;;
   esac
 fi
 
-# Log final line
-printf '%s: %s\n' "$event" "$msg" >> "$logfile" 2>/dev/null || true
+# --- Log parsed result ---
+if [[ -z "$dry_run" ]]; then
+  printf '%s: %s\n' "$event" "$msg" >> "$logfile" 2>/dev/null || true
+fi
 
-# --- Speak it (Linux/macOS/Windows fallback) ---
+# --- Speak it (or print in dry-run mode) ---
 say_it() {
+  local text="$1"
+
+  # Dry-run mode: just print
+  if [[ -n "$dry_run" ]]; then
+    echo "$text"
+    return
+  fi
+
+  # TTS engines in order of preference
   if command -v espeak-ng >/dev/null 2>&1; then
-    espeak-ng -s 180 -p 120 -v en-us+f4 "$1"
+    espeak-ng -s 180 -p 120 -v en-us+f4 "$text"
   elif command -v say >/dev/null 2>&1; then
-    say "$1"
-  elif command -v paplay >/dev/null 2>&1 && [ -f "$HOME/pda/notify.wav" ]; then
+    say "$text"
+  elif command -v paplay >/dev/null 2>&1 && [[ -f "$HOME/pda/notify.wav" ]]; then
     paplay "$HOME/pda/notify.wav"
-  elif command -v aplay >/dev/null 2>&1 && [ -f "$HOME/pda/notify.wav" ]; then
-    aplay  "$HOME/pda/notify.wav"
-  elif command -v powershell >/dev/null 2>&1; then
-    powershell -c "(New-Object Media.SoundPlayer \"$env:USERPROFILE\\pda\\notify.wav\").PlaySync()"
+  elif command -v aplay >/dev/null 2>&1 && [[ -f "$HOME/pda/notify.wav" ]]; then
+    aplay "$HOME/pda/notify.wav"
+  elif command -v powershell.exe >/dev/null 2>&1; then
+    powershell.exe -c "Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('$text')"
   else
-    echo "No TTS/player available to announce: $1" >&2
+    echo "No TTS available: $text" >&2
   fi
 }
+
 say_it "$msg"

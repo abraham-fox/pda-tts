@@ -8,21 +8,21 @@ This script integrates with Claude Code's hook system to provide voice notificat
 
 - **SessionStart**: Announces when a session begins ("Systems online.")
 - **Stop**: Announces when Claude finishes a task ("Task complete.")
-- **Notification**: Announces when Claude needs your input
+- **Notification**: Announces when Claude needs your input ("Awaiting your input.")
 
 The script reads the JSON payload from Claude Code, extracts the event type and message, and speaks it using your system's text-to-speech engine.
 
 ## How it works
 
-1. **Reads stdin**: Uses Python to safely read the JSON payload from Claude Code with a 0.2s timeout (prevents hanging)
-2. **Parses JSON**: Extracts `hook_event_name` and `message` fields
+1. **Reads stdin**: Uses bash `read -t` to safely read the JSON payload with a timeout (prevents hanging)
+2. **Parses JSON**: Uses `jq` to extract `hook_event_name` and `message` fields
 3. **Generates fallback messages**: If no message is provided, uses sensible defaults based on event type
-4. **Logs events**: Writes to `~/claude-hooks.log` for debugging
+4. **Logs events**: Writes to `~/claude-hooks.log` for debugging (configurable via `PDA_TTS_LOG`)
 5. **Speaks the message**: Uses the first available TTS engine:
    - `espeak-ng` (Linux) - preferred, with custom voice settings
    - `say` (macOS)
    - `paplay`/`aplay` with `~/pda/notify.wav` (Linux sound fallback)
-   - PowerShell MediaPlayer (Windows/WSL)
+   - PowerShell Speech Synthesizer (Windows/WSL)
 
 ## Installation
 
@@ -30,12 +30,16 @@ The script reads the JSON payload from Claude Code, extracts the event type and 
 
 **Linux (Debian/Ubuntu):**
 ```bash
-sudo apt install espeak-ng
+sudo apt install jq espeak-ng
 ```
 
-**macOS:** Built-in `say` command works out of the box.
+**macOS:**
+```bash
+brew install jq
+# say command is built-in
+```
 
-**Windows/WSL:** Either install espeak-ng in WSL, or create `~/pda/notify.wav` for sound-based notifications.
+**Windows/WSL:** Install jq and either espeak-ng in WSL, or use the PowerShell fallback.
 
 ### 2. Install the script
 
@@ -101,14 +105,24 @@ Add the following to `~/.claude/settings.json`:
 ### 4. Test it
 
 ```bash
-# Test with a sample payload
+# Run the test suite
+./test.sh
+
+# Or test manually with a sample payload
 echo '{"hook_event_name":"Notification","message":"Hello from PDA"}' | ~/bin/pda-tts.sh
 
-# Or test without payload (uses default message)
+# Test without payload (uses default message)
 ~/bin/pda-tts.sh
 ```
 
 ## Configuration
+
+### Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PDA_TTS_LOG` | `~/claude-hooks.log` | Log file location |
+| `PDA_TTS_DRY_RUN` | (unset) | If set, prints message instead of speaking |
 
 ### Voice settings (espeak-ng)
 
@@ -125,11 +139,21 @@ If you prefer a notification sound instead of TTS, create `~/pda/notify.wav` and
 
 ### Logging
 
-All events are logged to `~/claude-hooks.log`. Check this file for debugging:
+All events are logged to `~/claude-hooks.log` (or `$PDA_TTS_LOG`). Check this file for debugging:
 
 ```bash
 tail -f ~/claude-hooks.log
 ```
+
+## Development
+
+Run tests before committing:
+
+```bash
+./test.sh
+```
+
+The test suite uses dry-run mode (`PDA_TTS_DRY_RUN=1`) to verify message parsing without triggering TTS.
 
 ## License
 

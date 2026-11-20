@@ -7,17 +7,17 @@ A text-to-speech notification hook for [Claude Code](https://claude.ai/claude-co
 This script integrates with Claude Code's hook system to provide voice notifications for:
 
 - **SessionStart**: Announces when a session begins ("Systems online.")
-- **Stop**: Announces when Claude finishes a task ("Task complete.")
-- **Notification**: Announces when Claude needs your input ("Awaiting your input.")
+- **Stop**: Says which project finished and what was done, e.g. "my-app: Fixed the parser, tests green." A reply that ends by asking you something gets "Needs your decision." appended.
+- **Notification**: Says which project needs you ("my-app needs your permission.", "my-app is waiting for your input."); other notifications are spoken as sent.
 
-The script reads the JSON payload from Claude Code, extracts the event type and message, and speaks it using your system's text-to-speech engine.
+The project is the last folder of the session's working directory; a worktree under `<repo>/.claude/worktrees/` speaks the repo's name.
 
 ## How it works
 
 1. **Reads stdin**: Uses bash `read -t` to safely read the JSON payload with a timeout (prevents hanging)
-2. **Parses JSON**: Uses `jq` to extract `hook_event_name` and `message` fields
-3. **Generates fallback messages**: If no message is provided, uses sensible defaults based on event type
-4. **Logs events**: Writes to `~/claude-hooks.log` for debugging (configurable via `PDA_TTS_LOG`)
+2. **Detaches**: Hands the rest to a background process (`setsid`) and returns, because `claude -p` kills its hooks when it exits
+3. **Builds the line**: For Stop, `claude -p --model haiku` turns `last_assistant_message` into one spoken line. The call loads no user settings, so it fires no hooks of its own. If the call fails, returns nothing or exceeds `PDA_TTS_SUMMARY_TIMEOUT`, the script speaks the reply's first sentence instead, then "Task complete." as a last resort
+4. **Logs events**: Appends one line per event to `~/claude-hooks.log`: event, project, notification type, where the text came from, the transcript path and the spoken text
 5. **Speaks the message**: Uses the first available TTS engine:
    - `espeak-ng` (Linux) - preferred, with custom voice settings
    - `say` (macOS)
@@ -108,30 +108,34 @@ Add the following to `~/.claude/settings.json`:
 # Run the test suite
 ./test.sh
 
-# Or test manually with a sample payload
-echo '{"hook_event_name":"Notification","message":"Hello from PDA"}' | ~/bin/pda-tts.sh
+# Hear a phrase with the current voice settings
+~/bin/pda-tts.sh --say "Hello from PDA"
 
-# Test without payload (uses default message)
-~/bin/pda-tts.sh
+# Print what your recent real sessions would have said (dry run, calls Haiku)
+./replay.sh 5
 ```
 
 ## Configuration
 
-### Environment variables
+Settings are bash assignments in `~/.config/pda-tts/config` (start from `config.example`, which lists every setting with its range). Environment variables override the file, so you can try a voice without editing anything:
+
+```bash
+PDA_TTS_VOICE=en-gb+m3 PDA_TTS_SPEED=160 ~/bin/pda-tts.sh --say "Task complete"
+```
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `PDA_TTS_VOICE` | `en-us+f4` | espeak-ng language + variant; `espeak-ng --voices=en` lists languages, `ls /usr/lib/x86_64-linux-gnu/espeak-ng-data/voices/!v` the variants |
+| `PDA_TTS_SPEED` | `180` | Words per minute |
+| `PDA_TTS_PITCH` | `120` | 0 to 99; anything above 99 sounds the same as 99 |
+| `PDA_TTS_AMPLITUDE` | `100` | Volume, 0 to 200 |
+| `PDA_TTS_SUMMARY_MODEL` | `haiku` | Model for the Stop line; `off` speaks the reply's first sentence |
+| `PDA_TTS_SUMMARY_TIMEOUT` | `15` | Seconds to wait for the model |
+| `PDA_TTS_MUTE` | (unset) | Silences the script; export it in a cron job to mute that job's headless sessions only |
 | `PDA_TTS_LOG` | `~/claude-hooks.log` | Log file location |
-| `PDA_TTS_DRY_RUN` | (unset) | If set, prints message instead of speaking |
-
-### Voice settings (espeak-ng)
-
-The script uses these espeak-ng settings by default:
-- `-s 180` - Speed (words per minute)
-- `-p 120` - Pitch
-- `-v en-us+f4` - Voice variant
-
-To customize, edit the `say_it()` function in the script.
+| `PDA_TTS_LOG_MAX_BYTES` | `262144` | Past this size the log is cut to its newer half |
+| `PDA_TTS_CONFIG` | `~/.config/pda-tts/config` | Config file location |
+| `PDA_TTS_DRY_RUN` | (unset) | Prints the message instead of speaking; `voice` prints the espeak-ng command |
 
 ### Sound file fallback
 
@@ -153,7 +157,7 @@ Run tests before committing:
 ./test.sh
 ```
 
-The test suite uses dry-run mode (`PDA_TTS_DRY_RUN=1`) to verify message parsing without triggering TTS.
+The test suite runs with a stub `claude` and a stub `espeak-ng` in a temp dir, so it never calls a model, makes no sound and does not touch your config or log.
 
 ## License
 

@@ -1,0 +1,28 @@
+# pda-tts config: copy to ~/.config/pda-tts/config and uncomment what you change.
+# Plain bash assignments. Environment variables override this file.
+# Audition a setting without editing:  PDA_TTS_VOICE=en-gb+m3 ~/bin/pda-tts.sh --say "Hello"
+
+# --- Voice (espeak-ng) ---
+# Language + variant. Languages: espeak-ng --voices=en
+# Variants (after +): ls /usr/lib/x86_64-linux-gnu/espeak-ng-data/voices/!v
+#   e.g. f1..f5, m1..m8, klatt, klatt2..6, whisper, croak, Annie, Mr serious
+#PDA_TTS_VOICE=en-us+f4
+# Speed, words per minute (espeak default 175; ~80 to ~450 usable)
+#PDA_TTS_SPEED=180
+# Pitch, 0 to 99 (espeak default 50; higher values act as 99)
+#PDA_TTS_PITCH=120
+# Volume, 0 to 200 (default 100)
+#PDA_TTS_AMPLITUDE=100
+
+# --- What Stop says ---
+# Model that turns the final reply into one line; "off" speaks its first sentence
+#PDA_TTS_SUMMARY_MODEL=haiku
+# Seconds to wait for the model before falling back to the first sentence
+#PDA_TTS_SUMMARY_TIMEOUT=15
+
+# --- Other ---
+# Silence everything (a cron job can export it for its own sessions only)
+#PDA_TTS_MUTE=1
+# Log file and its size cap in bytes
+#PDA_TTS_LOG=~/claude-hooks.log
+#PDA_TTS_LOG_MAX_BYTES=262144

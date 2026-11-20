@@ -20,16 +20,6 @@ dry_run="${PDA_TTS_DRY_RUN:-}"
 if [[ -n "$dry_run" && -z "${PDA_TTS_LOG:-}" ]]; then logfile=""; else logfile="${PDA_TTS_LOG:-$HOME/claude-hooks.log}"; fi
 log_max_bytes="${PDA_TTS_LOG_MAX_BYTES:-262144}"
 
-voice="${PDA_TTS_VOICE:-en-us+f4}"
-speed="${PDA_TTS_SPEED:-180}"
-pitch="${PDA_TTS_PITCH:-120}"
-amplitude="${PDA_TTS_AMPLITUDE:-100}"
-
-# auto: espeak-ng, say, sound file, Windows, in that order; windows: Windows first.
-engine="${PDA_TTS_ENGINE:-auto}"
-win_voice="${PDA_TTS_WIN_VOICE:-Microsoft Zira Desktop}"
-win_rate="${PDA_TTS_WIN_RATE:-0}"
-win_volume="${PDA_TTS_WIN_VOLUME:-100}"
 powershell_bin="${PDA_TTS_POWERSHELL:-powershell.exe}"
 
 summary_model="${PDA_TTS_SUMMARY_MODEL:-haiku}"
@@ -41,7 +31,7 @@ summary_prompt="${PDA_TTS_SUMMARY_PROMPT:-$default_prompt}"
 # --- Read stdin with timeout (don't hang if empty); --say "text" auditions the voice ---
 payload=""
 if [[ "${1:-}" == --say ]]; then
-  payload=$(jq -cn --arg m "${2:-Testing the voice.}" '{hook_event_name:"Audition",message:$m}')
+  payload=$(jq -cn --arg m "${2:-Testing the voice.}" --arg e "${3:-Audition}" '{hook_event_name:$e,message:$m}')
   logfile="" PDA_TTS_DETACHED=1
 elif read -t 0.2 -r payload; then
   while read -t 0.1 -r line; do
@@ -58,6 +48,22 @@ fi
 field() { [[ -n "$payload" ]] && printf '%s' "$payload" | jq -r "$1 // \"\"" 2>/dev/null || true; }
 
 event=$(field .hook_event_name); event="${event:-Unknown}"
+
+# Voice setting NAME for this event: PDA_TTS_<NAME>_<EVENT> beats PDA_TTS_<NAME> beats the default.
+setting() {
+  local general="PDA_TTS_$1" specific
+  specific="PDA_TTS_$1_$(tr -cd 'A-Za-z0-9_' <<< "$event" | tr '[:lower:]' '[:upper:]')"
+  printf '%s' "${!specific:-${!general:-$2}}"
+}
+voice=$(setting VOICE en-us+f4)
+speed=$(setting SPEED 180)
+pitch=$(setting PITCH 120)
+amplitude=$(setting AMPLITUDE 100)
+# auto: espeak-ng, say, sound file, Windows, in that order; windows: Windows first.
+engine=$(setting ENGINE auto)
+win_voice=$(setting WIN_VOICE "Microsoft Zira Desktop")
+win_rate=$(setting WIN_RATE 0)
+win_volume=$(setting WIN_VOLUME 100)
 msg=$(field .message)
 cwd=$(field .cwd)
 ntype=$(field .notification_type)

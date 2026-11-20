@@ -141,6 +141,42 @@ PDA_TTS_VOICE=en-gb+m3 PDA_TTS_SPEED=160 ~/bin/pda-tts.sh --say "Task complete"
 | `PDA_TTS_CONFIG` | `~/.config/pda-tts/config` | Config file location |
 | `PDA_TTS_DRY_RUN` | (unset) | Prints the message instead of speaking; `voice` prints the espeak-ng command |
 
+### Per-event voices
+
+Every voice setting (`ENGINE`, `VOICE`, `SPEED`, `PITCH`, `AMPLITUDE`, `WIN_VOICE`, `WIN_RATE`, `WIN_VOLUME`) also takes an event suffix: `_STOP`, `_NOTIFICATION` or `_SESSIONSTART`. The suffixed setting wins for that event, wherever each one is set; events without one use the general setting. To hear an event's voice, pass the event after the text:
+
+```bash
+~/bin/pda-tts.sh --say "my-app needs your permission." Notification
+```
+
+### Example setups
+
+Linux, espeak-ng only:
+
+```bash
+PDA_TTS_VOICE=en-gb+f3
+PDA_TTS_SPEED=170
+PDA_TTS_PITCH=60
+```
+
+WSL, Windows voice for everything:
+
+```bash
+PDA_TTS_ENGINE=windows
+PDA_TTS_WIN_VOICE="Microsoft Zira Desktop"
+```
+
+WSL, a voice per kind of message: Zira reports finished work, David asks for input, and espeak announces a new session:
+
+```bash
+PDA_TTS_ENGINE=windows
+PDA_TTS_WIN_VOICE="Microsoft Zira Desktop"
+PDA_TTS_WIN_VOICE_NOTIFICATION="Microsoft David Desktop"
+PDA_TTS_WIN_RATE_NOTIFICATION=1
+PDA_TTS_ENGINE_SESSIONSTART=auto
+PDA_TTS_VOICE_SESSIONSTART=en-us+klatt
+```
+
 ### Sound file fallback
 
 If you prefer a notification sound instead of TTS, create `~/pda/notify.wav` and ensure espeak-ng is not installed. The script will fall back to playing the sound file.

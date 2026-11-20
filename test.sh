@@ -227,6 +227,33 @@ check "Windows missing: falls back to espeak" "yes" "$(yes_if grep -q -- '-- Fal
 result=$(echo '{"hook_event_name":"Stop"}' | PDA_TTS_ENGINE=windows PDA_TTS_DRY_RUN=voice bash "$SCRIPT")
 check "Windows: dry-run voice shows the engine" "windows voice=Microsoft Zira Desktop rate=0 volume=100 -- Task complete." "$result"
 
+# --- Per-event voices ---
+
+dryv() { PDA_TTS_DRY_RUN=voice bash "$SCRIPT"; }
+
+result=$(echo '{"hook_event_name":"Stop"}' | PDA_TTS_ENGINE=windows PDA_TTS_WIN_VOICE_STOP='Microsoft David Desktop' dryv)
+check "Per-event: Stop uses its own Windows voice" "windows voice=Microsoft David Desktop rate=0 volume=100 -- Task complete." "$result"
+
+result=$(echo '{"hook_event_name":"Notification"}' | PDA_TTS_ENGINE=windows PDA_TTS_WIN_VOICE_STOP='Microsoft David Desktop' dryv)
+check "Per-event: other events keep the general voice" "windows voice=Microsoft Zira Desktop rate=0 volume=100 -- Awaiting your input." "$result"
+
+result=$(echo '{"hook_event_name":"Notification"}' | PDA_TTS_ENGINE_NOTIFICATION=windows PDA_TTS_WIN_RATE_NOTIFICATION=3 dryv)
+check "Per-event: engine and rate per event" "windows voice=Microsoft Zira Desktop rate=3 volume=100 -- Awaiting your input." "$result"
+
+result=$(echo '{"hook_event_name":"SessionStart"}' | PDA_TTS_ENGINE_NOTIFICATION=windows PDA_TTS_SPEED_SESSIONSTART=140 PDA_TTS_VOICE_SESSIONSTART=en-gb+m3 dryv)
+check "Per-event: espeak settings per event" "espeak-ng -s 140 -p 120 -a 100 -v en-gb+m3 -- Systems online." "$result"
+
+printf 'PDA_TTS_ENGINE=windows\nPDA_TTS_WIN_VOICE_STOP="Microsoft David Desktop"\n' > "$tmp/config"
+result=$(echo '{"hook_event_name":"Stop"}' | PDA_TTS_CONFIG="$tmp/config" PDA_TTS_WIN_VOICE='Other' dryv)
+check "Per-event: config per-event beats env general" "windows voice=Microsoft David Desktop rate=0 volume=100 -- Task complete." "$result"
+
+result=$(echo '{"hook_event_name":"Weird-Event.1"}' | PDA_TTS_ENGINE=windows dryv)
+check "Per-event: odd event name is harmless" "windows voice=Microsoft Zira Desktop rate=0 volume=100 -- Weird-Event.1 event occurred." "$result"
+
+rm -f "$tmp/ps-out"
+PATH="$tmp/bin:$PATH" PDA_TTS_ENGINE=windows PDA_TTS_WIN_VOICE_NOTIFICATION='Microsoft David Desktop' bash "$SCRIPT" --say 'Hi' Notification
+check "Audition: --say with an event uses that event's voice" "voice=Microsoft David Desktop" "$(grep '^voice=' "$tmp/ps-out" 2>/dev/null)"
+
 # --- Summary ---
 echo
 echo "Results: $passed passed, $failed failed"

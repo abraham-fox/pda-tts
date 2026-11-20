@@ -173,6 +173,37 @@ title first review-inbox
 result=$(stopt "$ws" 'Done.' "$tmp/t.jsonl" | run)
 check "Status: latest session name beats project and branch" "review-inbox: done." "$result"
 
+# Transcript lines: b=<gitBranch>, a=<ai-title>, c=<custom-title>
+tscript() { : > "$tmp/t2.jsonl"; for e in "$@"; do case "$e" in
+  b=*) jq -cn --arg v "${e#b=}" '{type:"assistant",gitBranch:$v}' ;;
+  a=*) jq -cn --arg v "${e#a=}" '{type:"ai-title",aiTitle:$v}' ;;
+  c=*) jq -cn --arg v "${e#c=}" '{type:"custom-title",customTitle:$v}' ;;
+esac >> "$tmp/t2.jsonl"; done; }
+
+tscript b=SUP-23660-skip-unchanged-model-ratings 'a=SUP-1 Old title' 'a=SUP-23655 Trustpilot ratings import/export'
+result=$(stopt "$ws" 'Done.' "$tmp/t2.jsonl" | run)
+check "Status: latest auto-title without the ticket beats the branch" "webshop-services, Trustpilot ratings import export: done." "$result"
+
+tscript b=SUP-23660-skip-unchanged-model-ratings 'a=SUP-23667 Jira ticket'
+result=$(stopt "$ws" 'Done.' "$tmp/t2.jsonl" | run)
+check "Status: generic auto-title falls back to the branch" "webshop-services, skip unchanged model ratings: done." "$result"
+
+tscript b=SUP-23660-skip-unchanged-model-ratings a=Refactoring
+result=$(stopt "$ws" 'Done.' "$tmp/t2.jsonl" | run)
+check "Status: one-word auto-title falls back to the branch" "webshop-services, skip unchanged model ratings: done." "$result"
+
+tscript b=main b=ABC-7-from-the-transcript
+result=$(stopt "$ws" 'Done.' "$tmp/t2.jsonl" | run)
+check "Status: transcript branch beats the folder's branch" "webshop-services, from the transcript: done." "$result"
+
+tscript b=HEAD
+result=$(stopt "$ws" 'Done.' "$tmp/t2.jsonl" | run)
+check "Status: detached HEAD in the transcript adds nothing" "webshop-services: done." "$result"
+
+tscript 'a=ERP-1974 failed order deletion' c=inbox
+result=$(stopt "$ws" 'Done.' "$tmp/t2.jsonl" | run)
+check "Status: session name beats the auto-title" "inbox: done." "$result"
+
 result=$(stopt "$ws" 'Nik, the plan is ready.
 
 Go?' | run)

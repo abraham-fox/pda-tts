@@ -99,22 +99,42 @@ session_name() {
   grep -F '"type":"custom-title"' "$transcript" 2>/dev/null | tail -n 1 | jq -r '.customTitle // ""' 2>/dev/null || true
 }
 
+# The session's auto-title without ticket ids; nothing when only a generic word pair is left.
+title_words() {
+  local title
+  [[ -n "$transcript" && -r "$transcript" ]] || return 0
+  title=$(grep -F '"type":"ai-title"' "$transcript" 2>/dev/null | tail -n 1 | jq -r '.aiTitle // ""' 2>/dev/null)
+  title=$(sed -E 's/\b[A-Za-z]+-[0-9]+\b//g; s/[/_|]+/ /g; s/[[:space:]]+/ /g; s/^[ ,:;.-]+//; s/[ ,:;.-]+$//' <<< "$title")
+  shopt -s nocasematch
+  [[ "$title" =~ ^((jira|github)\ )?(ticket|task|issue|story|bug|pr|pull\ request|review)s?$ ]] && title=""
+  shopt -u nocasematch
+  [[ "$title" == *" "* ]] && cut -d' ' -f1-6 <<< "$title"
+  return 0
+}
+
 # The branch as spoken words: path and ticket prefix dropped, nothing on a default branch.
+# The transcript records the session's own branch; git on the folder is the fallback.
 branch_words() {
-  local branch
-  [[ -n "$cwd" ]] || return 0
-  branch=$(git -C "$cwd" branch --show-current 2>/dev/null) || return 0
+  local branch=""
+  if [[ -n "$transcript" && -r "$transcript" ]]; then
+    branch=$(tail -c 2000000 "$transcript" 2>/dev/null | grep -o '"gitBranch":"[^"]*"' | tail -n 1 | cut -d'"' -f4)
+  fi
+  if [[ -z "$branch" && -n "$cwd" ]]; then
+    branch=$(git -C "$cwd" branch --show-current 2>/dev/null)
+  fi
   branch="${branch##*/}"
   case "$branch" in ""|main|master|develop|HEAD) return 0 ;; esac
   sed -E 's/^[A-Za-z]+-[0-9]+([-_.]|$)//; s/[-_.]+/ /g; s/^ +//; s/ +$//' <<< "$branch" | cut -d' ' -f1-6
 }
 
-# Who is speaking: the session name, else the project and the branch words.
+# Who is speaking: the session name, else the project and what the session is about
+# (its auto-title, else its branch).
 who=""
 if [[ "$event" == Stop || "$event" == Notification ]]; then
   who=$(session_name)
   if [[ -z "$who" && -n "$project" ]]; then
-    task=$(branch_words)
+    task=$(title_words)
+    [[ -z "$task" ]] && task=$(branch_words)
     who="$project${task:+, $task}"
   fi
 fi

@@ -29,11 +29,12 @@
 ## Done (v3)
 
 - [x] Stop speaks who and the state (done, has a question, needs a decision, blocked, failed) instead of a summary
-- [x] Who: the session name, else the project and the branch words without the ticket prefix
+- [x] Who: the session name, else the project and the session's auto-title, else its branch (from the transcript), ticket ids dropped
 - [x] The summary stays available as `PDA_TTS_STOP_STYLE=summary`, with a leading "Nik," dropped
 
 ## Next
 
+- [ ] Evaluate Jev (TypeSafe AI, multiple-choice model, hosted API) for the Stop state choice: latency, price, and whether replies may leave for a third party
 - [ ] Per-event custom messages (e.g. replace "Systems online.")
 - [ ] Windows OneCore voices (Microsoft Mark) via Windows.Media.SpeechSynthesis
 - [ ] Windows pitch (`PDA_TTS_WIN_PITCH`) through SSML `<prosody pitch>`

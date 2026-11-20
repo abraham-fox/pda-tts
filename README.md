@@ -12,7 +12,9 @@ This script integrates with Claude Code's hook system to provide voice notificat
 
 The session is named by:
 - its name, when it has one (`claude -n <name>` or `/rename`);
-- otherwise the project, the last folder of the working directory (a worktree under `<repo>/.claude/worktrees/` speaks the repo's name), followed by the branch as words. The ticket prefix and any `feature/`-style path are dropped, so `SUP-23660-skip-unchanged-model-ratings` becomes "skip unchanged model ratings"; `main`, `master`, `develop` and a detached HEAD add nothing.
+- otherwise the project, the last folder of the working directory (a worktree under `<repo>/.claude/worktrees/` speaks the repo's name), followed by what the session is about:
+  - the session's auto-title from its transcript, without ticket ids: "SUP-23655 Trustpilot ratings import/export" becomes "Trustpilot ratings import export". A title left with one word or a generic pair such as "Jira ticket" is skipped;
+  - else the session's branch from its transcript (git on the folder when the transcript has none) as words, with the ticket prefix and any `feature/`-style path dropped: `SUP-23660-skip-unchanged-model-ratings` becomes "skip unchanged model ratings"; `main`, `master`, `develop` and a detached HEAD add nothing.
 
 ## How it works
 

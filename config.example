@@ -55,7 +55,8 @@
 # ============================================================================
 # status:  "<who>: <state>." with state done, has a question, needs a decision, blocked or failed
 # summary: "<who>: <one-line summary of the final reply>"
-# <who> is the session name (claude -n, /rename), else the project and the branch as words
+# <who> is the session name (claude -n, /rename), else the project and the session's
+# auto-title without ticket ids, else its branch as words
 #PDA_TTS_STOP_STYLE=status
 # Model that reads the final reply; "off" skips it: the state is "has a question" when the
 # reply ends with a question mark, else "done" (the summary style speaks its first sentence)

@@ -1,0 +1,2 @@
+*.sh text eol=lf
+config.example text eol=lf

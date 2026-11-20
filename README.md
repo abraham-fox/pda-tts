@@ -7,16 +7,18 @@ A text-to-speech notification hook for [Claude Code](https://claude.ai/claude-co
 This script integrates with Claude Code's hook system to provide voice notifications for:
 
 - **SessionStart**: Announces when a session begins ("Systems online.")
-- **Stop**: Says which project finished and what was done, e.g. "my-app: Fixed the parser, tests green." A reply that ends by asking you something gets "Needs your decision." appended.
-- **Notification**: Says which project needs you ("my-app needs your permission.", "my-app is waiting for your input."); other notifications are spoken as sent.
+- **Stop**: Says which session finished and in what state, e.g. "webshop-services, skip unchanged model ratings: needs a decision." The state is one of: done, has a question, needs a decision, blocked, failed. `PDA_TTS_STOP_STYLE=summary` speaks a one-line summary of the reply instead.
+- **Notification**: Says which session needs you ("my-app: needs your permission.", "my-app: waiting for your input."); other notifications are spoken as sent.
 
-The project is the last folder of the session's working directory; a worktree under `<repo>/.claude/worktrees/` speaks the repo's name.
+The session is named by:
+- its name, when it has one (`claude -n <name>` or `/rename`);
+- otherwise the project, the last folder of the working directory (a worktree under `<repo>/.claude/worktrees/` speaks the repo's name), followed by the branch as words. The ticket prefix and any `feature/`-style path are dropped, so `SUP-23660-skip-unchanged-model-ratings` becomes "skip unchanged model ratings"; `main`, `master`, `develop` and a detached HEAD add nothing.
 
 ## How it works
 
 1. **Reads stdin**: Uses bash `read -t` to safely read the JSON payload with a timeout (prevents hanging)
 2. **Detaches**: Hands the rest to a background process (`setsid`) and returns, because `claude -p` kills its hooks when it exits
-3. **Builds the line**: For Stop, `claude -p --model haiku` turns `last_assistant_message` into one spoken line. The call loads no user settings, so it fires no hooks of its own. If the call fails, returns nothing or exceeds `PDA_TTS_SUMMARY_TIMEOUT`, the script speaks the reply's first sentence instead, then "Task complete." as a last resort
+3. **Builds the line**: For Stop, `claude -p --model haiku` reads `last_assistant_message` and answers with one word for its state; the script turns that word into the spoken phrase, so the model's wording is never spoken. The call loads no user settings, so it fires no hooks of its own. If the call fails, answers anything else or exceeds `PDA_TTS_SUMMARY_TIMEOUT`, the state is "has a question" when the reply's last paragraph ends with a question mark, otherwise "done". In the summary style the model writes the line itself, falling back to the reply's first sentence, then "Task complete."
 4. **Logs events**: Appends one line per event to `~/claude-hooks.log`: event, project, notification type, where the text came from, the transcript path and the spoken text
 5. **Speaks the message**: Uses the first available TTS engine:
    - `espeak-ng` (Linux) - preferred, with custom voice settings
@@ -138,7 +140,8 @@ PDA_TTS_ESPEAK_VOICE=en-gb+m3 PDA_TTS_ESPEAK_SPEED=160 ~/bin/pda-tts.sh --say "T
 | `PDA_TTS_WIN_VOICE` | `Microsoft Zira Desktop` | Windows voice name from `--voices`; an unknown name keeps the system default |
 | `PDA_TTS_WIN_RATE` | `0` | Windows speed, -10 to 10 |
 | `PDA_TTS_WIN_VOLUME` | `100` | Windows volume, 0 to 100 |
-| `PDA_TTS_SUMMARY_MODEL` | `haiku` | Model for the Stop line; `off` speaks the reply's first sentence |
+| `PDA_TTS_STOP_STYLE` | `status` | `status`: who and the state; `summary`: who and a one-line summary of the reply |
+| `PDA_TTS_SUMMARY_MODEL` | `haiku` | Model that reads the reply; `off` uses the fallback (question mark, or the first sentence in the summary style) |
 | `PDA_TTS_SUMMARY_TIMEOUT` | `15` | Seconds to wait for the model |
 | `PDA_TTS_MUTE` | (unset) | Silences the script; export it in a cron job to mute that job's headless sessions only |
 | `PDA_TTS_LOG` | `~/claude-hooks.log` | Log file location |
@@ -151,7 +154,7 @@ PDA_TTS_ESPEAK_VOICE=en-gb+m3 PDA_TTS_ESPEAK_SPEED=160 ~/bin/pda-tts.sh --say "T
 Every voice setting (`ENGINE`, `ESPEAK_VOICE`, `ESPEAK_SPEED`, `ESPEAK_PITCH`, `ESPEAK_VOLUME`, `WIN_VOICE`, `WIN_RATE`, `WIN_VOLUME`) also takes an event suffix: `_STOP`, `_NOTIFICATION` or `_SESSIONSTART`. The suffixed setting wins for that event, wherever each one is set; events without one use the general setting. To hear an event's voice, pass the event after the text:
 
 ```bash
-~/bin/pda-tts.sh --say "my-app needs your permission." Notification
+~/bin/pda-tts.sh --say "my-app: needs your permission." Notification
 ```
 
 ### Example setups

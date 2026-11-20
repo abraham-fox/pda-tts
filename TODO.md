@@ -26,6 +26,12 @@
 - [x] `--voices` lists installed espeak-ng languages, variants and Windows voices
 - [x] espeak settings renamed to `PDA_TTS_ESPEAK_*`, mirroring `PDA_TTS_WIN_*`
 
+## Done (v3)
+
+- [x] Stop speaks who and the state (done, has a question, needs a decision, blocked, failed) instead of a summary
+- [x] Who: the session name, else the project and the branch words without the ticket prefix
+- [x] The summary stays available as `PDA_TTS_STOP_STYLE=summary`, with a leading "Nik," dropped
+
 ## Next
 
 - [ ] Per-event custom messages (e.g. replace "Systems online.")

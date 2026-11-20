@@ -118,6 +118,11 @@ check "Haiku: user hooks disabled (no recursion)" "yes" "$(yes_if grep -qx -- --
 check "Haiku: child is muted" "mute=1" "$(cat "$tmp/claude-env" 2>/dev/null)"
 check "Haiku: reply sent on stdin" "yes" "$(yes_if grep -q 'I fixed the parser' "$tmp/claude-stdin")"
 
+long_reply="Nik, I wrote the plan. $(printf 'filler %.0s' {1..2000}) Want me to go ahead?"
+stop /home/u/my-app "$long_reply" | PDA_TTS_SUMMARY_MODEL=haiku STUB_MODE=ok run >/dev/null
+check "Haiku: long reply keeps its head" "yes" "$(yes_if grep -q 'I wrote the plan' "$tmp/claude-stdin")"
+check "Haiku: long reply keeps its closing question" "yes" "$(yes_if grep -q 'Want me to go ahead' "$tmp/claude-stdin")"
+
 result=$(stop /home/u/my-app 'Fixed it.' | PDA_TTS_SUMMARY_MODEL=haiku STUB_MODE=ok STUB_OUT=$'Line one\nline two' run)
 check "Haiku: multi-line output collapsed" "my-app: Line one line two" "$result"
 

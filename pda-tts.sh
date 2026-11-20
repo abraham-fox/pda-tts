@@ -74,8 +74,10 @@ first_sentence() {
 haiku_summary() {
   [[ "$summary_model" == off ]] && return 0
   local reply out
-  reply=$(jq -r '.last_assistant_message // ""' <<< "$payload" 2>/dev/null | head -c 6000) || return 0
+  reply=$(jq -r '.last_assistant_message // ""' <<< "$payload" 2>/dev/null) || return 0
   [[ -z "$reply" ]] && return 0
+  # Keep the head and the tail of a long reply: a closing question decides "Needs your decision".
+  (( ${#reply} > 6000 )) && reply="${reply:0:4000}"$'\n[...]\n'"${reply: -2000}"
   # --setting-sources "" loads no user settings, so no hooks fire in the child; the mute is a second guard.
   out=$(cd "${TMPDIR:-/tmp}" && printf '<reply>\n%s\n</reply>\n' "$reply" \
     | PDA_TTS_MUTE=1 timeout "$summary_timeout" "$claude_bin" -p --model "$summary_model" \

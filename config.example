@@ -5,7 +5,7 @@
 # --- Voice (espeak-ng) ---
 # Language + variant. Languages: espeak-ng --voices=en
 # Variants (after +): ls /usr/lib/x86_64-linux-gnu/espeak-ng-data/voices/!v
-#   e.g. f1..f5, m1..m8, klatt, klatt2..6, whisper, croak, Annie, Mr serious
+#   e.g. f1..f5, m1..m8, klatt, klatt2..6, whisper, croak, Annie
 #PDA_TTS_VOICE=en-us+f4
 # Speed, words per minute (espeak default 175; ~80 to ~450 usable)
 #PDA_TTS_SPEED=180

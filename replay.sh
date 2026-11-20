@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Replays real hook payloads through pda-tts.sh in dry-run and prints what each would say.
-# Stop: the envelope comes from the hook log, the reply from the session transcript.
-# Notification and SessionStart: the logged payload as it is.
+# Replays the final replies of recent sessions through pda-tts.sh in dry-run and prints
+# what each Stop would say. Sessions come from the transcript paths in the hook log.
 # Reads the user's own data at run time; nothing is stored in the repo.
 #
 # Usage: replay.sh [count]   (PDA_TTS_SUMMARY_MODEL=off skips the Haiku call)
@@ -13,7 +12,6 @@ count="${1:-5}"
 
 speak() { printf '%s' "$1" | PDA_TTS_LOG= PDA_TTS_DRY_RUN=1 bash "$SCRIPT"; }
 
-echo "== Stop (last $count sessions)"
 grep -oE '"transcript_path":"[^"]+"|transcript=[^ ]+' "$log" | sed -E 's/^"transcript_path":"|^transcript=//; s/"$//' \
   | tac | awk '!seen[$0]++' | head -n "$count" | while read -r transcript; do
     [[ -r "$transcript" ]] || continue
@@ -25,10 +23,3 @@ grep -oE '"transcript_path":"[^"]+"|transcript=[^ ]+' "$log" | sed -E 's/^"trans
     printf '  says:  %s\n\n' "$(speak "$payload")"
   done
 
-for event in Notification SessionStart; do
-  echo "== $event (last $count logged)"
-  grep -oE '^stdin preview: \{.*"hook_event_name":"'"$event"'".*\}$' "$log" \
-    | sed 's/^stdin preview: //' | tail -n "$count" | while read -r payload; do
-      printf '  %s\n' "$(speak "$payload")"
-    done
-done

@@ -129,6 +129,10 @@ PDA_TTS_VOICE=en-gb+m3 PDA_TTS_SPEED=160 ~/bin/pda-tts.sh --say "Task complete"
 | `PDA_TTS_SPEED` | `180` | Words per minute |
 | `PDA_TTS_PITCH` | `120` | 0 to 99; anything above 99 sounds the same as 99 |
 | `PDA_TTS_AMPLITUDE` | `100` | Volume, 0 to 200 |
+| `PDA_TTS_ENGINE` | `auto` | `auto` tries the engines in the order above; `windows` uses the Windows voices first and falls back to `auto` when PowerShell is missing or fails |
+| `PDA_TTS_WIN_VOICE` | `Microsoft Zira Desktop` | Windows voice; `config.example` has the command that lists installed ones. An unknown name keeps the system default |
+| `PDA_TTS_WIN_RATE` | `0` | Windows speed, -10 to 10 |
+| `PDA_TTS_WIN_VOLUME` | `100` | Windows volume, 0 to 100 |
 | `PDA_TTS_SUMMARY_MODEL` | `haiku` | Model for the Stop line; `off` speaks the reply's first sentence |
 | `PDA_TTS_SUMMARY_TIMEOUT` | `15` | Seconds to wait for the model |
 | `PDA_TTS_MUTE` | (unset) | Silences the script; export it in a cron job to mute that job's headless sessions only |

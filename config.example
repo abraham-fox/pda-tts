@@ -2,7 +2,7 @@
 # Plain bash assignments. Environment variables override this file.
 # Audition a setting without editing:  PDA_TTS_VOICE=en-gb+m3 ~/bin/pda-tts.sh --say "Hello"
 
-# --- Voice (espeak-ng) ---
+# --- Voice (espeak-ng, PDA_TTS_ENGINE=auto) ---
 # Language + variant. Languages: espeak-ng --voices=en
 # Variants (after +): ls /usr/lib/x86_64-linux-gnu/espeak-ng-data/voices/!v
 #   e.g. f1..f5, m1..m8, klatt, klatt2..6, whisper, croak, Annie
@@ -13,6 +13,20 @@
 #PDA_TTS_PITCH=120
 # Volume, 0 to 200 (default 100)
 #PDA_TTS_AMPLITUDE=100
+
+# --- Engine ---
+# auto: espeak-ng, then macOS say, sound file, Windows. windows: Windows voices first (WSL).
+#PDA_TTS_ENGINE=auto
+
+# --- Voice (Windows, PDA_TTS_ENGINE=windows) ---
+# Installed voices:
+#   powershell.exe -c 'Add-Type -A System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).GetInstalledVoices().VoiceInfo.Name'
+# An unknown name keeps the system default voice.
+#PDA_TTS_WIN_VOICE="Microsoft Zira Desktop"
+# Rate, -10 (slow) to 10 (fast)
+#PDA_TTS_WIN_RATE=0
+# Volume, 0 to 100
+#PDA_TTS_WIN_VOLUME=100
 
 # --- What Stop says ---
 # Model that turns the final reply into one line; "off" speaks its first sentence

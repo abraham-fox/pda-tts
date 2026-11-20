@@ -25,6 +25,13 @@ speed="${PDA_TTS_SPEED:-180}"
 pitch="${PDA_TTS_PITCH:-120}"
 amplitude="${PDA_TTS_AMPLITUDE:-100}"
 
+# auto: espeak-ng, say, sound file, Windows, in that order; windows: Windows first.
+engine="${PDA_TTS_ENGINE:-auto}"
+win_voice="${PDA_TTS_WIN_VOICE:-Microsoft Zira Desktop}"
+win_rate="${PDA_TTS_WIN_RATE:-0}"
+win_volume="${PDA_TTS_WIN_VOLUME:-100}"
+powershell_bin="${PDA_TTS_POWERSHELL:-powershell.exe}"
+
 summary_model="${PDA_TTS_SUMMARY_MODEL:-haiku}"
 summary_timeout="${PDA_TTS_SUMMARY_TIMEOUT:-15}"
 claude_bin="${PDA_TTS_CLAUDE:-claude}"
@@ -127,11 +134,18 @@ fi
 say_it() {
   local text="$1"
 
-  if [[ "$dry_run" == voice ]]; then
+  if [[ "$dry_run" == voice && "$engine" == windows ]]; then
+    echo "windows voice=$win_voice rate=$win_rate volume=$win_volume -- $text"
+    return
+  elif [[ "$dry_run" == voice ]]; then
     echo "espeak-ng -s $speed -p $pitch -a $amplitude -v $voice -- $text"
     return
   elif [[ -n "$dry_run" ]]; then
     echo "$text"
+    return
+  fi
+
+  if [[ "$engine" == windows ]] && speak_windows "$text"; then
     return
   fi
 
@@ -143,12 +157,28 @@ say_it() {
     paplay "$HOME/pda/notify.wav"
   elif command -v aplay >/dev/null 2>&1 && [[ -f "$HOME/pda/notify.wav" ]]; then
     aplay "$HOME/pda/notify.wav"
-  elif command -v powershell.exe >/dev/null 2>&1; then
-    PDA_TTS_TEXT="$text" WSLENV=PDA_TTS_TEXT powershell.exe -NoProfile -c \
-      'Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak($env:PDA_TTS_TEXT)'
+  elif speak_windows "$text"; then
+    return
   else
     echo "No TTS available: $text" >&2
   fi
+}
+
+# Speaks through the Windows System.Speech synthesizer; fails when PowerShell is absent.
+speak_windows() {
+  command -v "$powershell_bin" >/dev/null 2>&1 || return 1
+  # Values travel as env vars shared via WSLENV, so quotes in the text need no escaping.
+  # Running from /mnt/c avoids the UNC-path warning PowerShell prints for a WSL cwd.
+  ( cd /mnt/c 2>/dev/null
+    PDA_TTS_TEXT="$1" PDA_TTS_WIN_VOICE="$win_voice" PDA_TTS_WIN_RATE="$win_rate" PDA_TTS_WIN_VOLUME="$win_volume" \
+    WSLENV="PDA_TTS_TEXT:PDA_TTS_WIN_VOICE:PDA_TTS_WIN_RATE:PDA_TTS_WIN_VOLUME${WSLENV:+:$WSLENV}" \
+    "$powershell_bin" -NoProfile -NonInteractive -Command '
+      Add-Type -AssemblyName System.Speech
+      $s = New-Object System.Speech.Synthesis.SpeechSynthesizer
+      try { $s.SelectVoice($env:PDA_TTS_WIN_VOICE) } catch {}
+      $s.Rate = [int]$env:PDA_TTS_WIN_RATE
+      $s.Volume = [int]$env:PDA_TTS_WIN_VOLUME
+      $s.Speak($env:PDA_TTS_TEXT)' >/dev/null 2>&1 )
 }
 
 say_it "$msg" || true

@@ -30,7 +30,7 @@ export PDA_TTS_LOG="$tmp/log"
 export PDA_TTS_CLAUDE="$tmp/bin/claude"
 export PDA_TTS_SUMMARY_MODEL=off
 export STUB_DIR="$tmp"
-unset PDA_TTS_MUTE PDA_TTS_VOICE PDA_TTS_SPEED PDA_TTS_PITCH PDA_TTS_AMPLITUDE
+unset PDA_TTS_MUTE PDA_TTS_VOICE PDA_TTS_SPEED PDA_TTS_PITCH PDA_TTS_AMPLITUDE PDA_TTS_ENGINE PDA_TTS_WIN_VOICE PDA_TTS_WIN_RATE PDA_TTS_WIN_VOLUME
 
 passed=0
 failed=0
@@ -199,6 +199,33 @@ rm -f "$tmp/espeak-args" "$tmp/log"
 PATH="$tmp/bin:$PATH" PDA_TTS_VOICE=en-gb+m3 bash "$SCRIPT" --say 'Hello there'
 check "Audition: --say speaks with the given voice" "-s 180 -p 120 -a 100 -v en-gb+m3 -- Hello there" "$(cat "$tmp/espeak-args" 2>/dev/null)"
 check "Audition: nothing logged" "no" "$(yes_if test -e "$tmp/log")"
+
+# --- Windows engine (stub powershell.exe) ---
+
+cat > "$tmp/bin/powershell.exe" <<'STUB'
+#!/usr/bin/env bash
+{ printf 'args=%s\n' "$*"; printf 'text=%s\nvoice=%s\nrate=%s\nvolume=%s\nwslenv=%s\n' \
+    "${PDA_TTS_TEXT:-}" "${PDA_TTS_WIN_VOICE:-}" "${PDA_TTS_WIN_RATE:-}" "${PDA_TTS_WIN_VOLUME:-}" "${WSLENV:-}"; } > "$STUB_DIR/ps-out"
+STUB
+chmod +x "$tmp/bin/powershell.exe"
+export PDA_TTS_POWERSHELL="$tmp/bin/powershell.exe"
+
+rm -f "$tmp/ps-out" "$tmp/espeak-args"
+PATH="$tmp/bin:$PATH" PDA_TTS_ENGINE=windows PDA_TTS_WIN_VOICE='Microsoft David Desktop' PDA_TTS_WIN_RATE=2 bash "$SCRIPT" --say "It's done"
+check "Windows: text passed through env, apostrophe intact" "text=It's done" "$(grep '^text=' "$tmp/ps-out" 2>/dev/null)"
+check "Windows: voice passed" "voice=Microsoft David Desktop" "$(grep '^voice=' "$tmp/ps-out" 2>/dev/null)"
+check "Windows: rate passed" "rate=2" "$(grep '^rate=' "$tmp/ps-out" 2>/dev/null)"
+check "Windows: volume default" "volume=100" "$(grep '^volume=' "$tmp/ps-out" 2>/dev/null)"
+check "Windows: env shared with Windows" "yes" "$(yes_if grep -q 'PDA_TTS_TEXT' <(grep '^wslenv=' "$tmp/ps-out"))"
+check "Windows: text not on the command line" "no" "$(yes_if grep -q "It's done" <(grep '^args=' "$tmp/ps-out"))"
+check "Windows: espeak not used" "no" "$(yes_if test -e "$tmp/espeak-args")"
+
+rm -f "$tmp/ps-out" "$tmp/espeak-args"
+PATH="$tmp/bin:$PATH" PDA_TTS_ENGINE=windows PDA_TTS_POWERSHELL=/nonexistent/powershell.exe bash "$SCRIPT" --say 'Fallback'
+check "Windows missing: falls back to espeak" "yes" "$(yes_if grep -q -- '-- Fallback' "$tmp/espeak-args")"
+
+result=$(echo '{"hook_event_name":"Stop"}' | PDA_TTS_ENGINE=windows PDA_TTS_DRY_RUN=voice bash "$SCRIPT")
+check "Windows: dry-run voice shows the engine" "windows voice=Microsoft Zira Desktop rate=0 volume=100 -- Task complete." "$result"
 
 # --- Summary ---
 echo

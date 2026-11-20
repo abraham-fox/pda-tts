@@ -12,6 +12,23 @@ if [[ -r "$config" ]]; then
   eval "$env_snapshot"
 fi
 
+# --voices lists what this machine can use for the voice settings.
+if [[ "${1:-}" == --voices ]]; then
+  echo "espeak-ng: PDA_TTS_ESPEAK_VOICE=<language>+<variant>, e.g. en-gb+m3"
+  if command -v espeak-ng >/dev/null 2>&1; then
+    data=$(espeak-ng --version 2>/dev/null | sed -n 's/.*Data at: //p')
+    echo "  languages: $(espeak-ng --voices=en 2>/dev/null | awk 'NR > 1 && $2 != "variant" {print $2}' | sort -u | paste -sd, - | sed 's/,/, /g')"
+    echo "  variants:  $(ls "$data/voices/!v" 2>/dev/null | paste -sd, - | sed 's/,/, /g')"
+  else
+    echo "  not available (espeak-ng not installed)"
+  fi
+  echo "Windows: PDA_TTS_WIN_VOICE=\"<name>\""
+  win_voices=$(cd /mnt/c 2>/dev/null; "${PDA_TTS_POWERSHELL:-powershell.exe}" -NoProfile -NonInteractive -Command \
+    'Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).GetInstalledVoices() | % { $_.VoiceInfo.Name }' 2>/dev/null | tr -d '\r')
+  if [[ -n "$win_voices" ]]; then sed 's/^/  /' <<< "$win_voices"; else echo "  not available (no PowerShell)"; fi
+  exit 0
+fi
+
 # Muted sessions (cron jobs export PDA_TTS_MUTE=1) stay silent and unlogged.
 [[ -n "${PDA_TTS_MUTE:-}" ]] && exit 0
 
@@ -55,10 +72,10 @@ setting() {
   specific="PDA_TTS_$1_$(tr -cd 'A-Za-z0-9_' <<< "$event" | tr '[:lower:]' '[:upper:]')"
   printf '%s' "${!specific:-${!general:-$2}}"
 }
-voice=$(setting VOICE en-us+f4)
-speed=$(setting SPEED 180)
-pitch=$(setting PITCH 120)
-amplitude=$(setting AMPLITUDE 100)
+voice=$(setting ESPEAK_VOICE en-us+f4)
+speed=$(setting ESPEAK_SPEED 180)
+pitch=$(setting ESPEAK_PITCH 120)
+amplitude=$(setting ESPEAK_VOLUME 100)
 # auto: espeak-ng, say, sound file, Windows, in that order; windows: Windows first.
 engine=$(setting ENGINE auto)
 win_voice=$(setting WIN_VOICE "Microsoft Zira Desktop")

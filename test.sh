@@ -30,7 +30,7 @@ export PDA_TTS_LOG="$tmp/log"
 export PDA_TTS_CLAUDE="$tmp/bin/claude"
 export PDA_TTS_SUMMARY_MODEL=off
 export STUB_DIR="$tmp"
-unset PDA_TTS_MUTE PDA_TTS_VOICE PDA_TTS_SPEED PDA_TTS_PITCH PDA_TTS_AMPLITUDE PDA_TTS_ENGINE PDA_TTS_WIN_VOICE PDA_TTS_WIN_RATE PDA_TTS_WIN_VOLUME
+unset PDA_TTS_MUTE PDA_TTS_ESPEAK_VOICE PDA_TTS_ESPEAK_SPEED PDA_TTS_ESPEAK_PITCH PDA_TTS_ESPEAK_VOLUME PDA_TTS_ENGINE PDA_TTS_WIN_VOICE PDA_TTS_WIN_RATE PDA_TTS_WIN_VOLUME
 
 passed=0
 failed=0
@@ -165,8 +165,8 @@ check "Mute: config file can mute" "" "$result"
 
 # --- Config precedence ---
 
-printf 'PDA_TTS_SPEED=999\n' > "$tmp/config"
-result=$(echo '{"hook_event_name":"Stop"}' | PDA_TTS_CONFIG="$tmp/config" PDA_TTS_SPEED=111 PDA_TTS_DRY_RUN=voice bash "$SCRIPT")
+printf 'PDA_TTS_ESPEAK_SPEED=999\n' > "$tmp/config"
+result=$(echo '{"hook_event_name":"Stop"}' | PDA_TTS_CONFIG="$tmp/config" PDA_TTS_ESPEAK_SPEED=111 PDA_TTS_DRY_RUN=voice bash "$SCRIPT")
 check "Config: env beats config file" "yes" "$(yes_if grep -q -- '-s 111' <<< "$result")"
 
 result=$(echo '{"hook_event_name":"Stop"}' | PDA_TTS_CONFIG="$tmp/config" PDA_TTS_DRY_RUN=voice bash "$SCRIPT")
@@ -196,7 +196,7 @@ for _ in {1..50}; do [[ -s "$tmp/espeak-args" ]] && break; sleep 0.1; done
 check "Real run: espeak gets the text after --" "-s 180 -p 120 -a 100 -v en-us+f4 -- my-app: I fixed the parser." "$(cat "$tmp/espeak-args" 2>/dev/null)"
 
 rm -f "$tmp/espeak-args" "$tmp/log"
-PATH="$tmp/bin:$PATH" PDA_TTS_VOICE=en-gb+m3 bash "$SCRIPT" --say 'Hello there'
+PATH="$tmp/bin:$PATH" PDA_TTS_ESPEAK_VOICE=en-gb+m3 bash "$SCRIPT" --say 'Hello there'
 check "Audition: --say speaks with the given voice" "-s 180 -p 120 -a 100 -v en-gb+m3 -- Hello there" "$(cat "$tmp/espeak-args" 2>/dev/null)"
 check "Audition: nothing logged" "no" "$(yes_if test -e "$tmp/log")"
 
@@ -204,6 +204,7 @@ check "Audition: nothing logged" "no" "$(yes_if test -e "$tmp/log")"
 
 cat > "$tmp/bin/powershell.exe" <<'STUB'
 #!/usr/bin/env bash
+[[ "$*" == *GetInstalledVoices* ]] && { printf 'Microsoft Zira Desktop\r\nMicrosoft David Desktop\r\n'; exit 0; }
 { printf 'args=%s\n' "$*"; printf 'text=%s\nvoice=%s\nrate=%s\nvolume=%s\nwslenv=%s\n' \
     "${PDA_TTS_TEXT:-}" "${PDA_TTS_WIN_VOICE:-}" "${PDA_TTS_WIN_RATE:-}" "${PDA_TTS_WIN_VOLUME:-}" "${WSLENV:-}"; } > "$STUB_DIR/ps-out"
 STUB
@@ -240,8 +241,8 @@ check "Per-event: other events keep the general voice" "windows voice=Microsoft 
 result=$(echo '{"hook_event_name":"Notification"}' | PDA_TTS_ENGINE_NOTIFICATION=windows PDA_TTS_WIN_RATE_NOTIFICATION=3 dryv)
 check "Per-event: engine and rate per event" "windows voice=Microsoft Zira Desktop rate=3 volume=100 -- Awaiting your input." "$result"
 
-result=$(echo '{"hook_event_name":"SessionStart"}' | PDA_TTS_ENGINE_NOTIFICATION=windows PDA_TTS_SPEED_SESSIONSTART=140 PDA_TTS_VOICE_SESSIONSTART=en-gb+m3 dryv)
-check "Per-event: espeak settings per event" "espeak-ng -s 140 -p 120 -a 100 -v en-gb+m3 -- Systems online." "$result"
+result=$(echo '{"hook_event_name":"SessionStart"}' | PDA_TTS_ENGINE_NOTIFICATION=windows PDA_TTS_ESPEAK_SPEED_SESSIONSTART=140 PDA_TTS_ESPEAK_VOICE_SESSIONSTART=en-gb+m3 PDA_TTS_ESPEAK_VOLUME_SESSIONSTART=150 dryv)
+check "Per-event: espeak settings per event" "espeak-ng -s 140 -p 120 -a 150 -v en-gb+m3 -- Systems online." "$result"
 
 printf 'PDA_TTS_ENGINE=windows\nPDA_TTS_WIN_VOICE_STOP="Microsoft David Desktop"\n' > "$tmp/config"
 result=$(echo '{"hook_event_name":"Stop"}' | PDA_TTS_CONFIG="$tmp/config" PDA_TTS_WIN_VOICE='Other' dryv)
@@ -253,6 +254,31 @@ check "Per-event: odd event name is harmless" "windows voice=Microsoft Zira Desk
 rm -f "$tmp/ps-out"
 PATH="$tmp/bin:$PATH" PDA_TTS_ENGINE=windows PDA_TTS_WIN_VOICE_NOTIFICATION='Microsoft David Desktop' bash "$SCRIPT" --say 'Hi' Notification
 check "Audition: --say with an event uses that event's voice" "voice=Microsoft David Desktop" "$(grep '^voice=' "$tmp/ps-out" 2>/dev/null)"
+
+# --- Old espeak names no longer apply ---
+
+result=$(echo '{"hook_event_name":"Stop"}' | PDA_TTS_SPEED=111 PDA_TTS_VOICE=en-gb+m3 dryv)
+check "Rename: old espeak names are ignored" "espeak-ng -s 180 -p 120 -a 100 -v en-us+f4 -- Task complete." "$result"
+
+# --- --voices lists what is installed ---
+
+mkdir -p "$tmp/edata/voices/!v" && touch "$tmp/edata/voices/!v/f1" "$tmp/edata/voices/!v/m3"
+cat > "$tmp/bin/espeak-ng" <<STUB
+#!/usr/bin/env bash
+case "\$1" in
+  --version) echo "eSpeak NG text-to-speech: 1.52.0  Data at: $tmp/edata" ;;
+  --voices=en) printf 'Pty Language Age/Gender VoiceName File Other\n 2 en-gb --/M English gmw/en\n 2 en-us --/M English gmw/en-US\n 5 variant --/F Annie !v/Annie\n' ;;
+  *) printf '%s\n' "\$*" > "$tmp/espeak-args" ;;
+esac
+STUB
+result=$(PATH="$tmp/bin:$PATH" bash "$SCRIPT" --voices)
+check "Voices: espeak languages listed" "yes" "$(yes_if grep -qx '  languages: en-gb, en-us' <<< "$result")"
+check "Voices: espeak variants listed" "yes" "$(yes_if grep -qx '  variants:  f1, m3' <<< "$result")"
+check "Voices: Windows voices listed" "yes" "$(yes_if grep -qx '  Microsoft David Desktop' <<< "$result")"
+check "Voices: setting names shown" "yes" "$(grep -q 'PDA_TTS_ESPEAK_VOICE' <<< "$result" && grep -q 'PDA_TTS_WIN_VOICE' <<< "$result" && echo yes || echo no)"
+
+result=$(PATH="$tmp/bin:$PATH" PDA_TTS_POWERSHELL=/nonexistent/powershell.exe bash "$SCRIPT" --voices)
+check "Voices: no PowerShell says so" "yes" "$(yes_if grep -q 'not available' <<< "$result")"
 
 # --- Summary ---
 echo

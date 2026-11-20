@@ -23,11 +23,14 @@
 - [x] Background TTS (detached worker, survives `claude -p` exit)
 - [x] Log: one parsed line per event, capped by size
 - [x] `--say "text" [Event]` to audition voices; `replay.sh` to preview real sessions
+- [x] `--voices` lists installed espeak-ng languages, variants and Windows voices
+- [x] espeak settings renamed to `PDA_TTS_ESPEAK_*`, mirroring `PDA_TTS_WIN_*`
 
 ## Next
 
 - [ ] Per-event custom messages (e.g. replace "Systems online.")
 - [ ] Windows OneCore voices (Microsoft Mark) via Windows.Media.SpeechSynthesis
+- [ ] Windows pitch (`PDA_TTS_WIN_PITCH`) through SSML `<prosody pitch>`
 - [ ] Serialize speech so two sessions finishing together don't talk over each other
 - [ ] Quiet hours (time-based mute)
 - [ ] More TTS engines (piper-tts, festival, flite)

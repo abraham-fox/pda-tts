@@ -108,6 +108,9 @@ Add the following to `~/.claude/settings.json`:
 # Run the test suite
 ./test.sh
 
+# List the voices this machine has
+~/bin/pda-tts.sh --voices
+
 # Hear a phrase with the current voice settings
 ~/bin/pda-tts.sh --say "Hello from PDA"
 
@@ -117,20 +120,22 @@ Add the following to `~/.claude/settings.json`:
 
 ## Configuration
 
-Settings are bash assignments in `~/.config/pda-tts/config` (start from `config.example`, which lists every setting with its range). Environment variables override the file, so you can try a voice without editing anything:
+Settings are bash assignments in `~/.config/pda-tts/config`. Start from `config.example`, which explains every setting with its range and the notable voices. `--voices` lists what the machine has installed. Environment variables override the file, so you can try a voice without editing anything:
 
 ```bash
-PDA_TTS_VOICE=en-gb+m3 PDA_TTS_SPEED=160 ~/bin/pda-tts.sh --say "Task complete"
+PDA_TTS_ESPEAK_VOICE=en-gb+m3 PDA_TTS_ESPEAK_SPEED=160 ~/bin/pda-tts.sh --say "Task complete"
 ```
+
+`ESPEAK_*` settings apply only to espeak-ng and `WIN_*` only to the Windows voices, so one file can hold both: the Windows engine falls back to espeak-ng with its own settings.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PDA_TTS_VOICE` | `en-us+f4` | espeak-ng language + variant; `espeak-ng --voices=en` lists languages, `ls /usr/lib/x86_64-linux-gnu/espeak-ng-data/voices/!v` the variants |
-| `PDA_TTS_SPEED` | `180` | Words per minute |
-| `PDA_TTS_PITCH` | `120` | 0 to 99; anything above 99 sounds the same as 99 |
-| `PDA_TTS_AMPLITUDE` | `100` | Volume, 0 to 200 |
 | `PDA_TTS_ENGINE` | `auto` | `auto` tries the engines in the order above; `windows` uses the Windows voices first and falls back to `auto` when PowerShell is missing or fails |
-| `PDA_TTS_WIN_VOICE` | `Microsoft Zira Desktop` | Windows voice; `config.example` has the command that lists installed ones. An unknown name keeps the system default |
+| `PDA_TTS_ESPEAK_VOICE` | `en-us+f4` | espeak-ng `<language>+<variant>`; `--voices` lists both |
+| `PDA_TTS_ESPEAK_SPEED` | `180` | Words per minute, 80 to 450 |
+| `PDA_TTS_ESPEAK_PITCH` | `120` | 0 to 99; anything above 99 sounds the same as 99 |
+| `PDA_TTS_ESPEAK_VOLUME` | `100` | 0 to 200 |
+| `PDA_TTS_WIN_VOICE` | `Microsoft Zira Desktop` | Windows voice name from `--voices`; an unknown name keeps the system default |
 | `PDA_TTS_WIN_RATE` | `0` | Windows speed, -10 to 10 |
 | `PDA_TTS_WIN_VOLUME` | `100` | Windows volume, 0 to 100 |
 | `PDA_TTS_SUMMARY_MODEL` | `haiku` | Model for the Stop line; `off` speaks the reply's first sentence |
@@ -139,11 +144,11 @@ PDA_TTS_VOICE=en-gb+m3 PDA_TTS_SPEED=160 ~/bin/pda-tts.sh --say "Task complete"
 | `PDA_TTS_LOG` | `~/claude-hooks.log` | Log file location |
 | `PDA_TTS_LOG_MAX_BYTES` | `262144` | Past this size the log is cut to its newer half |
 | `PDA_TTS_CONFIG` | `~/.config/pda-tts/config` | Config file location |
-| `PDA_TTS_DRY_RUN` | (unset) | Prints the message instead of speaking; `voice` prints the espeak-ng command |
+| `PDA_TTS_DRY_RUN` | (unset) | Prints the message instead of speaking; `voice` prints the engine and its settings |
 
 ### Per-event voices
 
-Every voice setting (`ENGINE`, `VOICE`, `SPEED`, `PITCH`, `AMPLITUDE`, `WIN_VOICE`, `WIN_RATE`, `WIN_VOLUME`) also takes an event suffix: `_STOP`, `_NOTIFICATION` or `_SESSIONSTART`. The suffixed setting wins for that event, wherever each one is set; events without one use the general setting. To hear an event's voice, pass the event after the text:
+Every voice setting (`ENGINE`, `ESPEAK_VOICE`, `ESPEAK_SPEED`, `ESPEAK_PITCH`, `ESPEAK_VOLUME`, `WIN_VOICE`, `WIN_RATE`, `WIN_VOLUME`) also takes an event suffix: `_STOP`, `_NOTIFICATION` or `_SESSIONSTART`. The suffixed setting wins for that event, wherever each one is set; events without one use the general setting. To hear an event's voice, pass the event after the text:
 
 ```bash
 ~/bin/pda-tts.sh --say "my-app needs your permission." Notification
@@ -154,9 +159,9 @@ Every voice setting (`ENGINE`, `VOICE`, `SPEED`, `PITCH`, `AMPLITUDE`, `WIN_VOIC
 Linux, espeak-ng only:
 
 ```bash
-PDA_TTS_VOICE=en-gb+f3
-PDA_TTS_SPEED=170
-PDA_TTS_PITCH=60
+PDA_TTS_ESPEAK_VOICE=en-gb+f3
+PDA_TTS_ESPEAK_SPEED=170
+PDA_TTS_ESPEAK_PITCH=60
 ```
 
 WSL, Windows voice for everything:
@@ -174,7 +179,7 @@ PDA_TTS_WIN_VOICE="Microsoft Zira Desktop"
 PDA_TTS_WIN_VOICE_NOTIFICATION="Microsoft David Desktop"
 PDA_TTS_WIN_RATE_NOTIFICATION=1
 PDA_TTS_ENGINE_SESSIONSTART=auto
-PDA_TTS_VOICE_SESSIONSTART=en-us+klatt
+PDA_TTS_ESPEAK_VOICE_SESSIONSTART=en-us+klatt
 ```
 
 ### Sound file fallback
